@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>Node-ChucK Control Interface connected through OSC</title>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <script src="/jquery-3.6.4.min.js"></script>
+        <script src="/p5.min.js"></script>
+    </head>
+
+    <body>
+        <div id="regenerate">
+            生成隨機陣列，分佈率為：
+            <a id="r-value">17%</a><input type="range" id="input-r" value="17" min="0" max="100" oninput="document.getElementById('r-value').innerHTML = this.value + '%';" />
+            <input type="submit" value="Submit" onclick="window.location.href = `?r=${document.getElementById('input-r').value}`" />
+        </div>
+        <div id="p5-container"></div>
+        <div class="flex" style="flex-direction: column" id="btns-container"></div>
+    </body>
+
+    <script>
+        const [sound_col, sound_row] = [10, 16];
+        let step = 0;
+        const bpm = 10;
+        const URL_params = new URLSearchParams(window.location.search);
+        let ratio = parseFloat(URL_params.get("r") || 17) / 100;
+
+        let canvas_width, canvas_height;
+        const col_info = ["A", "B", "C", "D", "E", "Weird", "Tra 1", "Tra 2", "Tra 3", "Cool"];
+
+        $(document).ready(() => {
+            document.getElementById("r-value").innerHTML = URL_params.get("r") + "%";
+            document.getElementById("input-r").value = URL_params.get("r");
+
+            const btns_container = document.getElementById("btns-container");
+            for (let i = 0; i < sound_col; i++) {
+                const btns = document.createElement("div");
+                btns.innerHTML = `<a>${col_info[i]}</a>`;
+                btns.style.display = "flex";
+                btns.style.flexDirection = "row";
+                btns.style.justifyContent = "end";
+                btns.style.alignItems = "center";
+                for (let j = 0; j < sound_row; j++) {
+                    const container = document.createElement("div");
+                    const btn = document.createElement("input");
+                    if (j % 4 == 3) {
+                        container.style.borderRight = "1px solid white";
+                    }
+                    btn.type = "checkbox";
+                    if (Math.random() > 1 - ratio) btn.checked = true;
+                    btn.classList.add("sound-btn");
+                    btn.id = `${i}-${j}`;
+                    container.appendChild(btn);
+                    btns.appendChild(container);
+                }
+                btns_container.appendChild(btns);
+            }
+        });
+
+        function send_osc(msg) {
+            // return
+            fetch(`/send/${msg}`, {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            }).then((res) => {
+                console.log("OSC sent: " + msg);
+            });
+        }
+
+        function setup() {
+            canvas_width = windowWidth * 0.9;
+            canvas_height = canvas_width / 16;
+            createCanvas(canvas_width, canvas_height).parent("p5-container");
+            colorMode(HSB);
+            background(255);
+        }
+
+        function draw() {
+            if (frameCount % bpm == 0) {
+                background(0);
+                stroke(0);
+                strokeWeight(3);
+
+                fill(Math.random() * 855, 255, 50);
+                rect((canvas_width * step) / 16, 0, canvas_height, canvas_height);
+                // console.log(step);
+                let sound_status = "";
+                for (let i = 0; i < sound_col; i++) {
+                    if (document.getElementById(`${i}-${step}`).checked) {
+                        sound_status += "1";
+                    } else {
+                        sound_status += "0";
+                    }
+                }
+                step < 15 ? step++ : (step = 0);
+                sound_status != "0" * sound_col ? send_osc(sound_status) : null;
+            }
+        }
+    </script>
+
+    <style>
+        input {
+            text-align: center;
+            font-size: 1rem;
+            width: fit;
+        }
+
+        .sound-btn {
+            width: 5vw;
+            height: 5vw;
+        }
+
+        .sound-btn:hover {
+            background-color: #555;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            text-align: center;
+            background-color: black;
+            color: white;
+        }
+
+        :checked {
+            color: red;
+            background-color: brown;
+        }
+
+        .flex {
+            display: flex;
+        }
+
+        p5-container {
+            position: absolute;
+        }
+        a {
+            color: white;
+        }
+    </style>
+</html>
